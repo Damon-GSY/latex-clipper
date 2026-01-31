@@ -1,17 +1,22 @@
-// LaTeX Copy Helper - Content Script
+// LaTeX Clipper - Content Script
 // 识别并处理 MathJax 和 KaTeX 渲染的公式
+
+const DEBUG = false;
+const log = DEBUG ? console.log.bind(console, '[LaTeX Clipper]') : () => {};
 
 class LaTeXCopyHelper {
   constructor() {
     this.currentButton = null;
     this.currentFormula = null;
+    this.observer = null;
+    this.debounceTimer = null;
     this.init();
   }
 
   init() {
-    console.log('[LaTeX Copy Helper] 插件已加载');
-    console.log('[LaTeX Copy Helper] 当前页面:', window.location.href);
-    console.log('[LaTeX Copy Helper] document.readyState:', document.readyState);
+    log('插件已加载');
+    log('当前页面:', window.location.href);
+    log('document.readyState:', document.readyState);
 
     // 延迟执行，等待页面数学公式渲染完成
     setTimeout(() => {
@@ -28,23 +33,32 @@ class LaTeXCopyHelper {
 
     // 监听 MathJax 渲染完成
     if (window.MathJax) {
-      console.log('[LaTeX Copy Helper] 检测到 MathJax');
+      log('检测到 MathJax');
       window.MathJax.startup.promise.then(() => {
-        console.log('[LaTeX Copy Helper] MathJax 渲染完成');
+        log('MathJax 渲染完成');
         setTimeout(() => this.attachListeners(), 500);
       }).catch(() => {
-        console.log('[LaTeX Copy Helper] MathJax promise failed, trying anyway');
+        log('MathJax promise failed, trying anyway');
       });
     }
   }
 
   // 监听 DOM 变化，处理动态加载的公式
   observeDOM() {
-    const observer = new MutationObserver((mutations) => {
-      this.attachListeners();
-    });
+    // Debounce: 避免频繁触发
+    const callback = () => {
+      if (this.debounceTimer) {
+        clearTimeout(this.debounceTimer);
+      }
+      this.debounceTimer = setTimeout(() => {
+        this.attachListeners();
+      }, 300);
+    };
 
-    observer.observe(document.body, {
+    this.observer = new MutationObserver(callback);
+
+    // 监听整个 body，但使用 debounce 减少触发频率
+    this.observer.observe(document.body, {
       childList: true,
       subtree: true
     });
@@ -56,7 +70,7 @@ class LaTeXCopyHelper {
     const formulas = this.findAllFormulas();
 
     if (formulas.length > 0) {
-      console.log(`[LaTeX Copy Helper] 找到 ${formulas.length} 个数学公式`);
+      log(`找到 ${formulas.length} 个数学公式`);
     }
 
     formulas.forEach(formula => {
@@ -99,8 +113,8 @@ class LaTeXCopyHelper {
 
     // 调试：打印找到的元素
     if (mjxContainers.length > 0) {
-      console.log(`[LaTeX Copy Helper] 找到 ${mjxContainers.length} 个 mjx-container`);
-      console.log('[LaTeX Copy Helper] 第一个 mjx-container:', mjxContainers[0]);
+      log(`找到 ${mjxContainers.length} 个 mjx-container`);
+      log('第一个 mjx-container:', mjxContainers[0]);
     }
 
     return formulas;
@@ -108,23 +122,23 @@ class LaTeXCopyHelper {
 
   // 从公式元素中提取 LaTeX 源码
   extractLaTeX(element) {
-    console.log('[LaTeX Copy Helper] 尝试提取 LaTeX，元素:', element.tagName, element.className);
+    log('尝试提取 LaTeX，元素:', element.tagName, element.className);
 
     // 尝试从 MathJax 提取
     const mjxData = this.extractFromMathJax(element);
     if (mjxData) {
-      console.log('[LaTeX Copy Helper] 从 MathJax 提取成功');
+      log('从 MathJax 提取成功');
       return mjxData;
     }
 
     // 尝试从 KaTeX 提取
     const katexData = this.extractFromKaTeX(element);
     if (katexData) {
-      console.log('[LaTeX Copy Helper] 从 KaTeX 提取成功');
+      log('从 KaTeX 提取成功');
       return katexData;
     }
 
-    console.log('[LaTeX Copy Helper] 提取失败，元素 HTML:', element.innerHTML.substring(0, 200));
+    log('提取失败，元素 HTML:', element.innerHTML.substring(0, 200));
     return null;
   }
 
@@ -133,46 +147,46 @@ class LaTeXCopyHelper {
     // MathJax 2.x - 从 script 标签中提取
     const script = element.querySelector('script[type*="math/tex"]');
     if (script) {
-      console.log('[LaTeX Copy Helper] 从 script 标签提取');
+      log('从 script 标签提取');
       return script.textContent;
     }
 
     // MathJax 3.x - 从 data 属性中提取
     if (element.hasAttribute('data-latex')) {
-      console.log('[LaTeX Copy Helper] 从 data-latex 属性提取');
+      log('从 data-latex 属性提取');
       return element.getAttribute('data-latex');
     }
 
     // 查找 annotation 标签（MathML）- MathJax 3.x 通用方式
     const annotation = element.querySelector('annotation[encoding="application/x-tex"]');
     if (annotation) {
-      console.log('[LaTeX Copy Helper] 从 annotation 标签提取:', annotation.textContent);
+      log('从 annotation 标签提取:', annotation.textContent);
       return annotation.textContent;
     }
 
     // 尝试在更深层次查找 annotation
     const allAnnotations = element.querySelectorAll('annotation');
-    console.log('[LaTeX Copy Helper] 找到 annotation 数量:', allAnnotations.length);
+    log('找到 annotation 数量:', allAnnotations.length);
     allAnnotations.forEach((ann, i) => {
-      console.log(`[LaTeX Copy Helper] annotation[${i}]:`, ann.encoding, ann.textContent?.substring(0, 50));
+      log(`annotation[${i}]:`, ann.encoding, ann.textContent?.substring(0, 50));
     });
 
     // 尝试从 MathJax 内部数据结构提取
     const mjxContainer = element.closest('mjx-container');
     if (mjxContainer) {
-      console.log('[LaTeX Copy Helper] 找到 mjx-container');
+      log('找到 mjx-container');
 
       // 查找相邻的 script 标签
       const prevScript = mjxContainer.previousElementSibling;
       if (prevScript && prevScript.tagName === 'SCRIPT' && prevScript.type && prevScript.type.includes('math/tex')) {
-        console.log('[LaTeX Copy Helper] 从前一个 script 提取');
+        log('从前一个 script 提取');
         return prevScript.textContent;
       }
 
       // 或者查找下一个 script 标签
       const nextScript = mjxContainer.nextElementSibling;
       if (nextScript && nextScript.tagName === 'SCRIPT' && nextScript.type && nextScript.type.includes('math/tex')) {
-        console.log('[LaTeX Copy Helper] 从下一个 script 提取');
+        log('从下一个 script 提取');
         return nextScript.textContent;
       }
     }
@@ -225,11 +239,11 @@ class LaTeXCopyHelper {
     // 提取 LaTeX 源码
     const latex = this.extractLaTeX(formula);
     if (!latex) {
-      console.log('[LaTeX Copy Helper] 无法提取 LaTeX 源码', formula);
+      log('无法提取 LaTeX 源码', formula);
       return;
     }
 
-    console.log('[LaTeX Copy Helper] 提取到 LaTeX:', latex);
+    log('提取到 LaTeX:', latex);
 
     // 创建复制按钮
     const button = document.createElement('button');
@@ -258,17 +272,6 @@ class LaTeXCopyHelper {
     document.body.appendChild(button);
     this.currentButton = button;
     this.currentFormula = formula;
-  }
-
-  // 更新按钮位置（跟随鼠标）
-  updateButtonPosition(event) {
-    if (!this.currentButton) return;
-
-    const mouseX = event.clientX;
-    const mouseY = event.clientY;
-
-    this.currentButton.style.left = `${mouseX + 15}px`;
-    this.currentButton.style.top = `${mouseY - 15}px`;
   }
 
   // 隐藏复制按钮
