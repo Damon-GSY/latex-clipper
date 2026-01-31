@@ -41,6 +41,13 @@ class LaTeXCopyHelper {
         log('MathJax promise failed, trying anyway');
       });
     }
+
+    // 监听窗口大小变化，更新按钮位置
+    window.addEventListener('resize', () => {
+      if (this.currentButton && this.currentFormula) {
+        this.updateButtonPosition(this.currentFormula);
+      }
+    });
   }
 
   // 监听 DOM 变化，处理动态加载的公式
@@ -85,12 +92,21 @@ class LaTeXCopyHelper {
       });
 
       formula.addEventListener('mouseleave', (e) => {
-        // 检查鼠标是否移动到按钮上
+        // 延迟隐藏，给用户时间移动到按钮上
         setTimeout(() => {
           if (!this.isMouseOverButton(e)) {
             this.hideCopyButton();
           }
-        }, 100);
+        }, 500);
+      });
+
+      // 双击直接复制
+      formula.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        const latex = this.extractLaTeX(formula);
+        if (latex) {
+          this.copyToClipboard(latex);
+        }
       });
     });
   }
@@ -249,14 +265,9 @@ class LaTeXCopyHelper {
     const button = document.createElement('button');
     button.className = 'latex-copy-button';
     button.textContent = '复制 LaTeX';
-    button.title = latex;
-
-    // 定位按钮 - 在公式的右上角
-    const rect = formula.getBoundingClientRect();
+    button.title = latex.substring(0, 100) + (latex.length > 100 ? '...' : '');
 
     button.style.position = 'fixed';
-    button.style.right = `${window.innerWidth - rect.right + 10}px`;
-    button.style.top = `${rect.top}px`;
     button.style.zIndex = '999999';
 
     // 点击复制
@@ -272,6 +283,9 @@ class LaTeXCopyHelper {
     document.body.appendChild(button);
     this.currentButton = button;
     this.currentFormula = formula;
+
+    // 设置按钮位置（包含边界检测）
+    this.updateButtonPosition(formula);
   }
 
   // 隐藏复制按钮
@@ -295,11 +309,47 @@ class LaTeXCopyHelper {
     );
   }
 
+  // 更新按钮位置（支持窗口 resize）
+  updateButtonPosition(formula) {
+    if (!this.currentButton) return;
+
+    const rect = formula.getBoundingClientRect();
+    const buttonRect = this.currentButton.getBoundingClientRect();
+
+    // 估算按钮尺寸
+    const buttonWidth = buttonRect.width > 0 ? buttonRect.width : 120;
+    const buttonHeight = buttonRect.height > 0 ? buttonRect.height : 40;
+
+    // 按钮放在公式框外上方，水平居中
+    let left = rect.left + (rect.width - buttonWidth) / 2;
+    let top = rect.top - buttonHeight - 8; // 公式上方 8px
+
+    // 确保不超出视口
+    left = Math.max(10, Math.min(left, window.innerWidth - buttonWidth - 10));
+
+    // 如果上方空间不足，改放在公式下方
+    if (top < 10) {
+      top = rect.bottom + 8;
+    }
+
+    this.currentButton.style.left = `${left}px`;
+    this.currentButton.style.top = `${top}px`;
+
+    // 第一次渲染后，用实际尺寸重新定位一次
+    if (buttonRect.width === 0) {
+      requestAnimationFrame(() => {
+        if (this.currentButton) {
+          this.updateButtonPosition(formula);
+        }
+      });
+    }
+  }
+
   // 复制到剪贴板
   async copyToClipboard(text) {
     try {
       await navigator.clipboard.writeText(text);
-      this.showNotification('LaTeX 已复制到剪贴板！');
+      this.showNotification('LaTeX 已复制到剪贴板！', text);
     } catch (err) {
       // 降级方案
       const textarea = document.createElement('textarea');
@@ -310,21 +360,47 @@ class LaTeXCopyHelper {
       textarea.select();
       document.execCommand('copy');
       document.body.removeChild(textarea);
-      this.showNotification('LaTeX 已复制到剪贴板！');
+      this.showNotification('LaTeX 已复制到剪贴板！', text);
     }
   }
 
-  // 显示通知
-  showNotification(message) {
+  // 显示通知（支持预览）
+  showNotification(message, latexText = null) {
     const notification = document.createElement('div');
     notification.className = 'latex-copy-notification';
-    notification.textContent = message;
+
+    // 主消息
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'latex-copy-notification-message';
+    messageDiv.textContent = message;
+    notification.appendChild(messageDiv);
+
+    // 如果有 LaTeX，显示预览
+    if (latexText) {
+      const preview = document.createElement('div');
+      preview.className = 'latex-copy-notification-preview';
+      const previewText = latexText.length > 60
+        ? latexText.substring(0, 60) + '...'
+        : latexText;
+      preview.textContent = previewText;
+      preview.title = latexText; // 鼠标悬停显示完整内容
+      notification.appendChild(preview);
+
+      // 点击通知可查看完整内容（通过 alert）
+      notification.style.cursor = 'pointer';
+      notification.addEventListener('click', () => {
+        // 使用 prompt 方便用户复制
+        prompt('完整的 LaTeX 代码（可以复制）:', latexText);
+      });
+    }
+
     document.body.appendChild(notification);
 
+    // 自动淡出
     setTimeout(() => {
       notification.classList.add('fade-out');
       setTimeout(() => notification.remove(), 300);
-    }, 2000);
+    }, 3000);
   }
 }
 
