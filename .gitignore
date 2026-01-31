@@ -1,0 +1,25 @@
+# macOS
+.DS_Store
+
+# Claude
+.claude/
+
+# Editor
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Node (if using for testing)
+node_modules/
+package-lock.json
+
+# Build
+dist/
+build/
+
+# Test
+*.log
+.env
+.env.local

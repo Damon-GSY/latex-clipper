@@ -1,0 +1,23 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <!-- 背景渐变 -->
+  <defs>
+    <linearGradient id="bg-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- 圆角矩形背景 -->
+  <rect width="128" height="128" rx="24" fill="url(#bg-gradient)"/>
+
+  <!-- LaTeX 符号 (Σ - Sigma) -->
+  <text x="64" y="85" font-family="Georgia, serif" font-size="72" font-weight="bold"
+        fill="white" text-anchor="middle">Σ</text>
+
+  <!-- 复制图标 -->
+  <g transform="translate(85, 25)">
+    <rect x="0" y="0" width="20" height="24" rx="2" fill="none" stroke="white" stroke-width="2.5"/>
+    <rect x="4" y="4" width="20" height="24" rx="2" fill="white"/>
+    <rect x="4" y="4" width="20" height="24" rx="2" fill="none" stroke="#667eea" stroke-width="2"/>
+  </g>
+</svg>

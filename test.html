@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LaTeX Copy Helper - 测试页面</title>
+
+    <!-- 加载 KaTeX -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+    <!-- 加载 MathJax -->
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']]
+            },
+            options: {
+                enableMenu: true,
+                skipHtmlTags: ['[-]', '[-]', '[-]']
+            },
+            startup: {
+                typeset: false
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+    <script>
+        // 保存 LaTeX 源码到 data 属性
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                // 查找所有包含 LaTeX 的 script 标签（在渲染前）
+                const mathElements = document.querySelectorAll('[class*="formula-block"]');
+                const latexMap = new Map();
+
+                // 遍历所有可能包含公式的元素
+                mathElements.forEach(block => {
+                    const text = block.textContent;
+                    // 查找 \[ ... \] 或 $$ ... $$ 格式
+                    const displayMatches = text.match(/\\\[(.+?)\\\]/gs) || text.match(/\$\$(.+?)\$\$/gs);
+                    // 查找 \( ... \) 或 $ ... $ 格式
+                    const inlineMatches = text.match(/\\\((.+?)\\\)/gs) || text.match(/\$(.+?)\$/gs);
+
+                    if (displayMatches) {
+                        displayMatches.forEach(latex => {
+                            latexMap.set(latex.trim(), latex.trim());
+                        });
+                    }
+                    if (inlineMatches) {
+                        inlineMatches.forEach(latex => {
+                            latexMap.set(latex.trim(), latex.trim());
+                        });
+                    }
+                });
+
+                // 等待 MathJax 渲染完成后，为每个 mjx-container 添加 data-latex
+                MathJax.typesetPromise().then(() => {
+                    const containers = document.querySelectorAll('mjx-container');
+                    console.log('找到', containers.length, '个 mjx-container');
+
+                    // 通过描述文本查找公式块并添加 data-latex
+                    function findBlockByDescription(desc) {
+                        const blocks = document.querySelectorAll('.formula-block');
+                        for (let block of blocks) {
+                            const descEl = block.querySelector('.description');
+                            if (descEl && descEl.textContent.includes(desc)) {
+                                return block.querySelector('mjx-container');
+                            }
+                        }
+                        return null;
+                    }
+
+                    const formulas = [
+                        {desc: '勾股定理', latex: 'a^2 + b^2 = c^2'},
+                        {desc: '二次方程求根公式', latex: 'x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}'},
+                        {desc: '麦克斯韦方程组', latex: '\\begin{aligned}\\nabla \\cdot \\mathbf{E} &= \\frac{\\rho}{\\epsilon_0} \\\\\\nabla \\cdot \\mathbf{B} &= 0 \\\\\\nabla \\times \\mathbf{E} &= -\\frac{\\partial \\mathbf{B}}{\\partial t} \\\\\\nabla \\times \\mathbf{B} &= \\mu_0\\mathbf{J} + \\mu_0\\epsilon_0\\frac{\\partial \\mathbf{E}}{\\partial t}\\n\\end{aligned}'},
+                        {desc: '薛定谔方程', latex: 'i\\hbar\\frac{\\partial}{\\partial t}\\Psi(\\mathbf{r},t) = \\hat{H}\\Psi(\\mathbf{r},t)'},
+                        {desc: '正态分布', latex: 'f(x) = \\frac{1}{\\sigma\\sqrt{2\\pi}}e^{-\\frac{1}{2}(\\frac{x-\\mu}{\\sigma})^2}'}
+                    ];
+
+                    formulas.forEach(({desc, latex}) => {
+                        const el = findBlockByDescription(desc);
+                        if (el) {
+                            el.setAttribute('data-latex', latex);
+                            console.log('为 [' + desc + '] 添加 data-latex');
+                        } else {
+                            console.log('未找到 [' + desc + '] 的公式');
+                        }
+                    });
+                });
+            }, 2000);
+        });
+    </script>
+
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            line-height: 1.8;
+            background: #f8fafc;
+        }
+
+        h1 {
+            color: #1e293b;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        h2 {
+            color: #334155;
+            margin-top: 40px;
+        }
+
+        .formula-block {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .description {
+            color: #64748b;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .inline-example {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #667eea;
+            border-radius: 4px;
+        }
+
+        code {
+            background: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+        }
+
+        .warning {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+
+        .success {
+            background: #d1fae5;
+            border-left: 4px solid #10b981;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>LaTeX Copy Helper - 测试页面</h1>
+
+    <div class="success">
+        <strong>使用说明：</strong>将鼠标悬停在下方的数学公式上，会出现"复制 LaTeX"按钮。点击按钮即可复制公式的 LaTeX 源码。
+    </div>
+
+    <h2>MathJax 示例</h2>
+
+    <div class="formula-block">
+        <div class="description">勾股定理（行内公式）</div>
+        <div class="inline-example">
+            在直角三角形中，有 \(a^2 + b^2 = c^2\) 这个关系。
+        </div>
+    </div>
+
+    <div class="formula-block">
+        <div class="description">二次方程求根公式（块级公式）</div>
+        \[x = \frac{-b \pm \sqrt{b^2-4ac}}{2a}\]
+    </div>
+
+    <div class="formula-block">
+        <div class="description">麦克斯韦方程组</div>
+        \[
+        \begin{aligned}
+        \nabla \cdot \mathbf{E} &= \frac{\rho}{\epsilon_0} \\
+        \nabla \cdot \mathbf{B} &= 0 \\
+        \nabla \times \mathbf{E} &= -\frac{\partial \mathbf{B}}{\partial t} \\
+        \nabla \times \mathbf{B} &= \mu_0\mathbf{J} + \mu_0\epsilon_0\frac{\partial \mathbf{E}}{\partial t}
+        \end{aligned}
+        \]
+    </div>
+
+    <div class="formula-block">
+        <div class="description">薛定谔方程</div>
+        \[i\hbar\frac{\partial}{\partial t}\Psi(\mathbf{r},t) = \hat{H}\Psi(\mathbf{r},t)\]
+    </div>
+
+    <h2>KaTeX 示例</h2>
+
+    <div class="formula-block">
+        <div class="description">欧拉公式（行内）</div>
+        <div class="inline-example">
+            著名的欧拉公式：<span id="euler-inline"></span>
+        </div>
+    </div>
+
+    <div class="formula-block">
+        <div class="description">积分公式（块级）</div>
+        <div id="integral-display"></div>
+    </div>
+
+    <div class="formula-block">
+        <div class="description">矩阵示例</div>
+        <div id="matrix-display"></div>
+    </div>
+
+    <div class="formula-block">
+        <div class="description">求和公式</div>
+        <div id="sum-display"></div>
+    </div>
+
+    <h2>混合示例</h2>
+
+    <div class="formula-block">
+        <div class="description">正态分布概率密度函数</div>
+        \[f(x) = \frac{1}{\sigma\sqrt{2\pi}}e^{-\frac{1}{2}(\frac{x-\mu}{\sigma})^2}\]
+    </div>
+
+    <div class="formula-block">
+        <div class="description">傅里叶变换</div>
+        <div id="fourier-display"></div>
+    </div>
+
+    <div class="warning">
+        <strong>提示：</strong>如果公式无法复制，请检查：
+        <ol>
+            <li>Chrome 扩展是否已正确安装</li>
+            <li>是否已刷新此页面</li>
+            <li>打开开发者工具（F12）查看是否有错误信息</li>
+        </ol>
+    </div>
+
+    <script>
+        // 渲染 KaTeX 公式并保存原始 LaTeX
+        document.addEventListener('DOMContentLoaded', function() {
+            // 辅助函数：渲染 KaTeX 并保存原始 LaTeX
+            function renderKatexWithSource(element, latex, displayMode) {
+                katex.render(latex, element, {
+                    displayMode: displayMode
+                });
+                // 将原始 LaTeX 保存到 data 属性
+                if (element.firstElementChild) {
+                    element.firstElementChild.setAttribute('data-latex', latex);
+                }
+            }
+
+            // 行内公式也使用 renderKatexWithSource
+            renderKatexWithSource(
+                document.getElementById('euler-inline'),
+                "e^{i\\pi} + 1 = 0",
+                false
+            );
+
+            // 块级公式 - 使用辅助函数保存原始 LaTeX
+            renderKatexWithSource(
+                document.getElementById('integral-display'),
+                "\\int_{-\\infty}^{\\infty} e^{-x^2} dx = \\sqrt{\\pi}",
+                true
+            );
+
+            renderKatexWithSource(
+                document.getElementById('matrix-display'),
+                "\\begin{bmatrix} a & b \\\\ c & d \\end{bmatrix}",
+                true
+            );
+
+            renderKatexWithSource(
+                document.getElementById('sum-display'),
+                "\\sum_{n=1}^{\\infty} \\frac{1}{n^2} = \\frac{\\pi^2}{6}",
+                true
+            );
+
+            renderKatexWithSource(
+                document.getElementById('fourier-display'),
+                "\\mathcal{F}(\\omega) = \\int_{-\\infty}^{\\infty} f(t)e^{-i\\omega t}dt",
+                true
+            );
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "LaTeX Copy Helper",
+  "version": "1.0.0",
+  "description": "自动识别页面上的 LaTeX 公式（MathJax 和 KaTeX），并提供一键复制源码功能",
+  "permissions": [
+    "clipboardWrite"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ]
+}
