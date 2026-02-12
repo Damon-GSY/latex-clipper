@@ -73,10 +73,14 @@ class LaTeXCopyHelper {
     this.observeDOM();
 
     // 监听窗口大小变化
+    let resizeTimer;
     window.addEventListener('resize', () => {
-      if (this.currentButton && this.currentFormula) {
-        this.updateButtonPosition(this.currentFormula);
-      }
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        if (this.currentButton && this.currentFormula) {
+          this.updateButtonPosition(this.currentFormula);
+        }
+      }, CONFIG.debounceDelay);
     });
 
     this.initialized = true;
