@@ -66,14 +66,6 @@ MathJax and KaTeX render beautiful formulas, but getting the source code back is
 | MathJax 3.x | `<annotation encoding="application/x-tex">` tag |
 | KaTeX | `<annotation>` tag or `data-latex` attribute |
 
-## Roadmap
-
-- [ ] Keyboard shortcuts (Ctrl/Cmd + Shift + C)
-- [ ] Settings panel (theme, button position)
-- [ ] Right-click context menu
-- [ ] Batch copy / Export all formulas
-- [ ] Full MathJax CHTML support
-
 ## Contributing
 
 Pull requests welcome. Keep it simple, keep it working.
