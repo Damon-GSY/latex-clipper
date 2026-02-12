@@ -260,6 +260,9 @@ class LaTeXCopyHelper {
 
     const button = document.createElement('button');
     button.className = 'latex-copy-button';
+    // Set fixed dimensions to avoid reflow
+    button.style.minWidth = '120px';
+    button.style.minHeight = '40px';
     button.textContent = '复制 LaTeX';
     button.title = latex.length > CONFIG.tooltipMaxLength ? latex.substring(0, CONFIG.tooltipMaxLength) + '...' : latex;
 
@@ -312,11 +315,6 @@ class LaTeXCopyHelper {
 
     this.currentButton.style.left = `${left}px`;
     this.currentButton.style.top = `${top}px`;
-
-    // 首次渲染后重新定位
-    if (buttonRect.width === 0) {
-      requestAnimationFrame(() => this.currentButton && this.updateButtonPosition(formula));
-    }
   }
 
   // ==================== 剪贴板 ====================
