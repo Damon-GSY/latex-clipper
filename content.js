@@ -354,12 +354,11 @@ class LaTeXCopyHelper {
     if (latexText) {
       const preview = document.createElement('div');
       preview.className = 'latex-copy-notification-preview';
-      preview.textContent = latexText.length > CONFIG.previewMaxLength ? latexText.substring(0, CONFIG.previewMaxLength) + '...' : latexText;
+      preview.textContent = latexText.length > CONFIG.previewMaxLength
+        ? latexText.substring(0, CONFIG.previewMaxLength) + '...'
+        : latexText;
       preview.title = latexText;
       notification.appendChild(preview);
-
-      notification.style.cursor = 'pointer';
-      notification.addEventListener('click', () => prompt('完整的 LaTeX 代码:', latexText));
     }
 
     document.body.appendChild(notification);
