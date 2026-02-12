@@ -57,7 +57,6 @@ class LaTeXCopyHelper {
     this.observer = null;
     this.debounceTimer = null;
     this.initialized = false;
-    this.formulaCount = 0;  // Track formula count for smart observation
     this.init();
   }
 
@@ -94,9 +93,10 @@ class LaTeXCopyHelper {
       await new Promise(resolve => document.addEventListener('DOMContentLoaded', resolve));
     }
 
-    // MathJax 就绪（如果存在）
+    // MathJax 就绪（如果存在），带超时保护
     if (window.MathJax?.startup?.promise) {
-      await window.MathJax.startup.promise.catch(() => {});
+      const timeout = new Promise(resolve => setTimeout(resolve, 2000));
+      await Promise.race([window.MathJax.startup.promise, timeout]).catch(() => {});
     }
 
     // 等待渲染完成
@@ -108,12 +108,8 @@ class LaTeXCopyHelper {
     this.observer = new MutationObserver(() => {
       clearTimeout(this.debounceTimer);
       this.debounceTimer = setTimeout(() => {
-        // Only rebind if new formulas detected
-        const currentCount = document.querySelectorAll(CONFIG.formulaSelectors.join(',')).length;
-        if (currentCount !== this.formulaCount) {
-          this.formulaCount = currentCount;
-          this.attachListeners();
-        }
+        // Always check for new formulas (attachListeners handles dedup via latexListenerAttached)
+        this.attachListeners();
       }, CONFIG.debounceDelay);
     });
 
@@ -126,7 +122,6 @@ class LaTeXCopyHelper {
   // ==================== 事件绑定 ====================
   attachListeners() {
     const formulas = this.findAllFormulas();
-    this.formulaCount = formulas.length;  // Update count
 
     if (formulas.length > 0) {
       log(`找到 ${formulas.length} 个数学公式`);
