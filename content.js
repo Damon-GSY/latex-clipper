@@ -57,6 +57,8 @@ class LaTeXCopyHelper {
     this.observer = null;
     this.debounceTimer = null;
     this.initialized = false;
+    this.lastMouseX = 0;
+    this.lastMouseY = 0;
     this.init();
   }
 
@@ -132,18 +134,38 @@ class LaTeXCopyHelper {
       formula.dataset.latexListenerAttached = 'true';
 
       formula.addEventListener('mouseenter', () => this.showCopyButton(formula));
-      formula.addEventListener('mouseleave', e => this.handleMouseLeave(e));
+      formula.addEventListener('mouseleave', () => this.handleMouseLeave());
+      formula.addEventListener('mousemove', e => {
+        this.lastMouseX = e.clientX;
+        this.lastMouseY = e.clientY;
+      });
       formula.addEventListener('dblclick', e => this.handleDoubleClick(e, formula));
     });
   }
 
-  handleMouseLeave(e) {
+  handleMouseLeave() {
     const { hideButtonDelay } = CONFIG;
     setTimeout(() => {
-      if (!this.isMouseOverButton(e)) {
+      if (!this.isMouseOverButtonOrFormula()) {
         this.hideCopyButton();
       }
     }, hideButtonDelay);
+  }
+
+  isMouseOverButtonOrFormula() {
+    if (!this.currentButton || !this.currentFormula) return false;
+
+    const buttonRect = this.currentButton.getBoundingClientRect();
+    const formulaRect = this.currentFormula.getBoundingClientRect();
+
+    // 检查鼠标是否在按钮或公式区域内
+    const checkOverlap = (rect) => {
+      const x = this.lastMouseX;
+      const y = this.lastMouseY;
+      return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+    };
+
+    return checkOverlap(buttonRect) || checkOverlap(formulaRect);
   }
 
   handleDoubleClick(e, formula) {
@@ -258,7 +280,11 @@ class LaTeXCopyHelper {
     button.title = latex.length > CONFIG.tooltipMaxLength ? latex.substring(0, CONFIG.tooltipMaxLength) + '...' : latex;
 
     button.addEventListener('click', () => this.copyToClipboard(latex));
-    button.addEventListener('mouseleave', () => this.hideCopyButton());
+    button.addEventListener('mouseleave', () => this.handleMouseLeave());
+    button.addEventListener('mousemove', e => {
+      this.lastMouseX = e.clientX;
+      this.lastMouseY = e.clientY;
+    });
 
     document.body.appendChild(button);
     this.currentButton = button;
@@ -271,17 +297,6 @@ class LaTeXCopyHelper {
     this.currentButton?.remove();
     this.currentButton = null;
     this.currentFormula = null;
-  }
-
-  isMouseOverButton(event) {
-    if (!this.currentButton) return false;
-    const rect = this.currentButton.getBoundingClientRect();
-    return (
-      event.clientX >= rect.left &&
-      event.clientX <= rect.right &&
-      event.clientY >= rect.top &&
-      event.clientY <= rect.bottom
-    );
   }
 
   updateButtonPosition(formula) {
