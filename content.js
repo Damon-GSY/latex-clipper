@@ -57,6 +57,7 @@ class LaTeXCopyHelper {
     this.observer = null;
     this.debounceTimer = null;
     this.initialized = false;
+    this.formulaCount = 0;  // Track formula count for smart observation
     this.init();
   }
 
@@ -108,14 +109,18 @@ class LaTeXCopyHelper {
 
   // ==================== DOM 观察 ====================
   observeDOM() {
-    const { debounceDelay } = CONFIG;
-
-    const callback = () => {
+    this.observer = new MutationObserver(() => {
       clearTimeout(this.debounceTimer);
-      this.debounceTimer = setTimeout(() => this.attachListeners(), debounceDelay);
-    };
+      this.debounceTimer = setTimeout(() => {
+        // Only rebind if new formulas detected
+        const currentCount = document.querySelectorAll(CONFIG.formulaSelectors.join(',')).length;
+        if (currentCount !== this.formulaCount) {
+          this.formulaCount = currentCount;
+          this.attachListeners();
+        }
+      }, CONFIG.debounceDelay);
+    });
 
-    this.observer = new MutationObserver(callback);
     this.observer.observe(document.body, {
       childList: true,
       subtree: true
@@ -125,6 +130,7 @@ class LaTeXCopyHelper {
   // ==================== 事件绑定 ====================
   attachListeners() {
     const formulas = this.findAllFormulas();
+    this.formulaCount = formulas.length;  // Update count
 
     if (formulas.length > 0) {
       log(`找到 ${formulas.length} 个数学公式`);
@@ -159,15 +165,7 @@ class LaTeXCopyHelper {
 
   // ==================== 公式查找 ====================
   findAllFormulas() {
-    const { formulaSelectors } = CONFIG;
-    const formulas = [];
-
-    // 扁平化所有选择器并查询
-    formulaSelectors.forEach(selector => {
-      formulas.push(...document.querySelectorAll(selector));
-    });
-
-    return formulas;
+    return [...document.querySelectorAll(CONFIG.formulaSelectors.join(','))];
   }
 
   // ==================== LaTeX 提取 ====================
