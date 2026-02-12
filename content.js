@@ -37,6 +37,18 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const DEBUG = false;
 const log = DEBUG ? console.log.bind(console, '[LaTeX Clipper]') : () => {};
 
+// 尝试多个提取策略，返回第一个成功的结果
+const tryStrategies = (strategies, successLog) => {
+  for (const strategy of strategies) {
+    const result = strategy();
+    if (result) {
+      if (successLog) log(successLog);
+      return result;
+    }
+  }
+  return null;
+};
+
 // ==================== 主类 ====================
 class LaTeXCopyHelper {
   constructor() {
@@ -122,7 +134,7 @@ class LaTeXCopyHelper {
       if (formula.dataset.latexListenerAttached) return;
       formula.dataset.latexListenerAttached = 'true';
 
-      formula.addEventListener('mouseenter', e => this.showCopyButton(formula, e));
+      formula.addEventListener('mouseenter', () => this.showCopyButton(formula));
       formula.addEventListener('mouseleave', e => this.handleMouseLeave(e));
       formula.addEventListener('dblclick', e => this.handleDoubleClick(e, formula));
     });
@@ -176,39 +188,27 @@ class LaTeXCopyHelper {
 
   // MathJax 提取策略
   tryExtractMathJax(element) {
-    const strategies = [
+    return tryStrategies([
       // MathJax 2.x: script 标签
-      () => element.querySelector('script[type*="math/tex"]')?.textContent,
+      () => element.querySelector(CONFIG.extractionSelectors.mathjaxScript)?.textContent,
 
       // MathJax 3.x: annotation 标签
-      () => element.querySelector('annotation[encoding="application/x-tex"]')?.textContent,
+      () => element.querySelector(CONFIG.extractionSelectors.texAnnotation)?.textContent,
 
       // mjx-container 相邻的 script
       () => {
         const container = element.closest?.('mjx-container');
         if (!container) return null;
 
-        const prev = container.previousElementSibling;
-        if (prev?.tagName === 'SCRIPT' && prev.type?.includes('math/tex')) {
-          return prev.textContent;
-        }
-
-        const next = container.nextElementSibling;
-        if (next?.tagName === 'SCRIPT' && next.type?.includes('math/tex')) {
-          return next.textContent;
+        const siblings = [container.previousElementSibling, container.nextElementSibling];
+        for (const sibling of siblings) {
+          if (sibling?.tagName === 'SCRIPT' && sibling.type?.includes('math/tex')) {
+            return sibling.textContent;
+          }
         }
         return null;
       }
-    ];
-
-    for (const strategy of strategies) {
-      const result = strategy();
-      if (result) {
-        log('从 MathJax 提取成功');
-        return result;
-      }
-    }
-    return null;
+    ], '从 MathJax 提取成功');
   }
 
   // KaTeX 提取策略
@@ -216,7 +216,7 @@ class LaTeXCopyHelper {
     const katexEl = element.closest?.('.katex');
     if (!katexEl) return null;
 
-    const strategies = [
+    return tryStrategies([
       // 自身 data-latex
       () => katexEl.getAttribute('data-latex'),
 
@@ -224,7 +224,7 @@ class LaTeXCopyHelper {
       () => katexEl.parentElement?.closest?.('[data-latex]')?.getAttribute('data-latex'),
 
       // annotation 标签
-      () => katexEl.querySelector('annotation[encoding="application/x-tex"]')?.textContent,
+      () => katexEl.querySelector(CONFIG.extractionSelectors.texAnnotation)?.textContent,
 
       // 相邻 script
       () => {
@@ -233,21 +233,12 @@ class LaTeXCopyHelper {
           ? prev.textContent
           : null;
       }
-    ];
-
-    for (const strategy of strategies) {
-      const result = strategy();
-      if (result) {
-        log('从 KaTeX 提取成功');
-        return result;
-      }
-    }
-    return null;
+    ], '从 KaTeX 提取成功');
   }
 
   // 降级提取：搜索所有 annotation
   fallbackExtract(element) {
-    const annotation = element.querySelector('annotation');
+    const annotation = element.querySelector(CONFIG.extractionSelectors.annotation);
     if (annotation) {
       log('使用降级提取');
       return annotation.textContent;
@@ -258,7 +249,7 @@ class LaTeXCopyHelper {
   }
 
   // ==================== 复制按钮 ====================
-  showCopyButton(formula, event) {
+  showCopyButton(formula) {
     this.hideCopyButton();
 
     const latex = this.extractLaTeX(formula);
