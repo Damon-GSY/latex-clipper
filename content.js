@@ -89,26 +89,18 @@ class LaTeXCopyHelper {
 
   // 统一的就绪等待
   async waitForReady() {
-    const { initDelay } = CONFIG;
-
-    // 基础延迟，等待公式渲染
-    const baseDelay = delay(initDelay);
-
     // DOM 就绪
-    const domReady = document.readyState === 'loading'
-      ? new Promise(resolve => document.addEventListener('DOMContentLoaded', resolve))
-      : Promise.resolve();
+    if (document.readyState === 'loading') {
+      await new Promise(resolve => document.addEventListener('DOMContentLoaded', resolve));
+    }
 
     // MathJax 就绪（如果存在）
-    const mathjaxReady = window.MathJax?.startup?.promise
-      ?.catch(() => log('MathJax promise failed, continuing anyway'))
-      || Promise.resolve();
+    if (window.MathJax?.startup?.promise) {
+      await window.MathJax.startup.promise.catch(() => {});
+    }
 
-    // 等待所有条件
-    await Promise.all([baseDelay, domReady, mathjaxReady]);
-
-    // 最后再等一小段时间确保渲染完成
-    await delay(initDelay);
+    // 等待渲染完成
+    await delay(CONFIG.initDelay);
   }
 
   // ==================== DOM 观察 ====================
