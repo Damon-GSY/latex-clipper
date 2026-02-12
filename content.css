@@ -70,21 +70,16 @@
   transform: translateY(-10px);
 }
 
-/* 为数学公式添加高亮效果 */
-mjx-container:hover {
-  outline: 2px solid rgba(99, 102, 241, 0.3);
-  outline-offset: 4px;
-  border-radius: 8px;
-  transition: outline 0.2s ease;
+/* 为数学公式添加交互样式 */
+mjx-container,
+.katex,
+.MathJax,
+.MathJax_Display {
+  cursor: pointer;
 }
 
-.katex:hover {
-  outline: 2px solid rgba(99, 102, 241, 0.3);
-  outline-offset: 4px;
-  border-radius: 8px;
-  transition: outline 0.2s ease;
-}
-
+mjx-container:hover,
+.katex:hover,
 .MathJax:hover,
 .MathJax_Display:hover {
   outline: 2px solid rgba(99, 102, 241, 0.3);
