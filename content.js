@@ -21,6 +21,7 @@ const CONFIG = {
   debounceDelay: 300,
   hideButtonDelay: 500,
   notificationDuration: 3000,
+  copySuccessHideDelay: 800,  // 复制成功后按钮自动隐藏延迟
 
   // UI 配置
   buttonOffset: 8,
@@ -56,14 +57,15 @@ class LaTeXCopyHelper {
     this.currentFormula = null;
     this.observer = null;
     this.debounceTimer = null;
+    this.copySuccessTimer = null;  // 复制成功后的自动隐藏计时器
+    this.hideTimer = null;  // 鼠标离开后的隐藏计时器
     this.initialized = false;
-    this.lastMouseX = 0;
-    this.lastMouseY = 0;
     this.init();
   }
 
   // ==================== 初始化 ====================
   async init() {
+    console.log('[LaTeX Clipper] v1.5.0 已加载 - 复制后自动隐藏功能已启用');
     log('插件已加载');
 
     // 等待 DOM 就绪
@@ -133,39 +135,35 @@ class LaTeXCopyHelper {
       if (formula.dataset.latexListenerAttached) return;
       formula.dataset.latexListenerAttached = 'true';
 
-      formula.addEventListener('mouseenter', () => this.showCopyButton(formula));
-      formula.addEventListener('mouseleave', () => this.handleMouseLeave());
-      formula.addEventListener('mousemove', e => {
-        this.lastMouseX = e.clientX;
-        this.lastMouseY = e.clientY;
+      formula.addEventListener('mouseenter', () => {
+        this.handleMouseEnter();
+        this.showCopyButton(formula);
       });
+      formula.addEventListener('mouseleave', () => this.handleMouseLeave());
       formula.addEventListener('dblclick', e => this.handleDoubleClick(e, formula));
     });
   }
 
   handleMouseLeave() {
     const { hideButtonDelay } = CONFIG;
-    setTimeout(() => {
-      if (!this.isMouseOverButtonOrFormula()) {
-        this.hideCopyButton();
-      }
+
+    // 清除之前的隐藏计时器
+    if (this.hideTimer) {
+      clearTimeout(this.hideTimer);
+    }
+
+    // 鼠标离开时延迟隐藏
+    this.hideTimer = setTimeout(() => {
+      this.hideCopyButton();
     }, hideButtonDelay);
   }
 
-  isMouseOverButtonOrFormula() {
-    if (!this.currentButton || !this.currentFormula) return false;
-
-    const buttonRect = this.currentButton.getBoundingClientRect();
-    const formulaRect = this.currentFormula.getBoundingClientRect();
-
-    // 检查鼠标是否在按钮或公式区域内
-    const checkOverlap = (rect) => {
-      const x = this.lastMouseX;
-      const y = this.lastMouseY;
-      return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
-    };
-
-    return checkOverlap(buttonRect) || checkOverlap(formulaRect);
+  handleMouseEnter() {
+    // 鼠标进入时清除隐藏计时器
+    if (this.hideTimer) {
+      clearTimeout(this.hideTimer);
+      this.hideTimer = null;
+    }
   }
 
   handleDoubleClick(e, formula) {
@@ -192,9 +190,10 @@ class LaTeXCopyHelper {
         || this.fallbackExtract(element);
   }
 
-  // 通用提取：data-latex 属性
+  // 通用提取：data-latex 或 data-math 属性
   tryExtractCommon(element) {
-    return element.getAttribute('data-latex');
+    return element.getAttribute('data-latex')
+        || element.getAttribute('data-math');
   }
 
   // MathJax 提取策略
@@ -224,27 +223,47 @@ class LaTeXCopyHelper {
 
   // KaTeX 提取策略
   tryExtractKaTeX(element) {
-    const katexEl = element.closest?.('.katex');
-    if (!katexEl) return null;
+    // 支持 .katex-display 和 .katex 两种情况
+    const katexEl = element.closest?.('.katex') || element.querySelector?.('.katex') || element;
+    const isKaTeX = katexEl.classList?.contains('katex') ||
+                    katexEl.classList?.contains('katex-display') ||
+                    element.closest?.('.katex-display');
 
-    return tryStrategies([
-      // 自身 data-latex
-      () => katexEl.getAttribute('data-latex'),
+    if (!isKaTeX && !element.classList?.contains('katex')) return null;
 
-      // 父元素 data-latex
-      () => katexEl.parentElement?.closest?.('[data-latex]')?.getAttribute('data-latex'),
+    // 收集可能的候选元素（自身及祖先）
+    const candidates = [katexEl, element];
+    let current = katexEl.parentElement;
+    while (current) {
+      candidates.push(current);
+      if (current.classList?.contains('math-block')) break;
+      current = current.parentElement;
+    }
 
-      // annotation 标签
-      () => katexEl.querySelector(CONFIG.extractionSelectors.texAnnotation)?.textContent,
-
-      // 相邻 script
-      () => {
-        const prev = katexEl.previousElementSibling;
-        return (prev?.tagName === 'SCRIPT' && prev.type === 'math/tex')
-          ? prev.textContent
-          : null;
+    // 尝试从候选元素获取 data-math 或 data-latex
+    for (const el of candidates) {
+      const latex = el?.getAttribute?.('data-math') || el?.getAttribute?.('data-latex');
+      if (latex) {
+        log('从 KaTeX data 属性提取成功');
+        return latex;
       }
-    ], '从 KaTeX 提取成功');
+    }
+
+    // annotation 标签
+    const annotation = katexEl.querySelector?.(CONFIG.extractionSelectors.texAnnotation)?.textContent;
+    if (annotation) {
+      log('从 KaTeX annotation 提取成功');
+      return annotation;
+    }
+
+    // 相邻 script
+    const prev = katexEl.previousElementSibling;
+    if (prev?.tagName === 'SCRIPT' && prev.type === 'math/tex') {
+      log('从 KaTeX 相邻 script 提取成功');
+      return prev.textContent;
+    }
+
+    return null;
   }
 
   // 降级提取：搜索所有 annotation
@@ -261,6 +280,11 @@ class LaTeXCopyHelper {
 
   // ==================== 复制按钮 ====================
   showCopyButton(formula) {
+    // 如果复制成功计时器正在运行，不重新创建按钮
+    if (this.copySuccessTimer) {
+      return;
+    }
+
     this.hideCopyButton();
 
     const latex = this.extractLaTeX(formula);
@@ -280,11 +304,8 @@ class LaTeXCopyHelper {
     button.title = latex.length > CONFIG.tooltipMaxLength ? latex.substring(0, CONFIG.tooltipMaxLength) + '...' : latex;
 
     button.addEventListener('click', () => this.copyToClipboard(latex));
+    button.addEventListener('mouseenter', () => this.handleMouseEnter());
     button.addEventListener('mouseleave', () => this.handleMouseLeave());
-    button.addEventListener('mousemove', e => {
-      this.lastMouseX = e.clientX;
-      this.lastMouseY = e.clientY;
-    });
 
     document.body.appendChild(button);
     this.currentButton = button;
@@ -294,6 +315,15 @@ class LaTeXCopyHelper {
   }
 
   hideCopyButton() {
+    // 清除所有计时器
+    if (this.copySuccessTimer) {
+      clearTimeout(this.copySuccessTimer);
+      this.copySuccessTimer = null;
+    }
+    if (this.hideTimer) {
+      clearTimeout(this.hideTimer);
+      this.hideTimer = null;
+    }
     this.currentButton?.remove();
     this.currentButton = null;
     this.currentFormula = null;
@@ -328,6 +358,7 @@ class LaTeXCopyHelper {
     try {
       await navigator.clipboard.writeText(text);
       this.showNotification('LaTeX 已复制到剪贴板！', text);
+      this.scheduleButtonHide();
     } catch {
       // 降级方案
       const textarea = document.createElement('textarea');
@@ -338,7 +369,33 @@ class LaTeXCopyHelper {
       document.execCommand('copy');
       textarea.remove();
       this.showNotification('LaTeX 已复制到剪贴板！', text);
+      this.scheduleButtonHide();
     }
+  }
+
+  // 复制成功后安排按钮自动隐藏
+  scheduleButtonHide() {
+    const { copySuccessHideDelay } = CONFIG;
+
+    // 清除之前的计时器
+    if (this.copySuccessTimer) {
+      clearTimeout(this.copySuccessTimer);
+    }
+    if (this.hideTimer) {
+      clearTimeout(this.hideTimer);
+      this.hideTimer = null;
+    }
+
+    // 更新按钮文字，给用户视觉反馈
+    if (this.currentButton) {
+      this.currentButton.textContent = '已复制 ✓';
+      this.currentButton.style.background = '#10b981';
+    }
+
+    // 设置新的自动隐藏计时器
+    this.copySuccessTimer = setTimeout(() => {
+      this.hideCopyButton();
+    }, copySuccessHideDelay);
   }
 
   // ==================== 通知 ====================
